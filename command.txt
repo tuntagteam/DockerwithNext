@@ -1,0 +1,1 @@
+docker compose exec next sh -lc "npm i -D prisma && npm i @prisma/client && npx prisma init"

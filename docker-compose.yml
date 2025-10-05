@@ -1,15 +1,13 @@
-version: "3.9"
-
 services:
   db:
     image: mysql:8.0
     command: --default-authentication-plugin=mysql_native_password
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"   # <-- allow empty
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_ROOT_HOST: "%"                # <-- allow root from phpMyAdmin container
+      MYSQL_ROOT_HOST: "%"
     ports:
-      - "3306:3306"
+      - "3307:3306"        # ← use 3307 on host to avoid conflicts with local MySQL
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -17,29 +15,33 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   phpmyadmin:
     image: phpmyadmin:5-apache
     environment:
       PMA_HOST: db
-      # Don’t set PMA_USER / PMA_PASSWORD so you can type root with blank password
     ports:
       - "8080:80"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
-next:
-  image: node:20-alpine
-  working_dir: /app
-  command: sh -c "npm install && npm run dev"
-  env_file: .env
-  volumes:
-    - ./app:/app
-  ports:
-    - "3000:3000"
-  depends_on:
-    db:
-      condition: service_healthy
+  next:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npx next dev -H 0.0.0.0 -p 3000"
+    env_file: .env
+    volumes:
+      - ./app:/app           # ← make sure this path is shared in Docker Desktop
+      - /app/node_modules    # ← keep container's node_modules separate
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   db_data:
